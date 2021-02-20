@@ -1,10 +1,11 @@
 <template>
-  <div ref="container"></div>
+  <div ref="container" id="container"></div>
 </template>
 
 <script>
 import { Vue, Component } from "vue-property-decorator";
 // import "./demo";
+import "./solider";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
@@ -22,7 +23,7 @@ export default class Three extends Vue {
   animationMixer = null;
   actions = [];
   clock = null;
-  mounted() {
+  mountedx() {
     this.container = this.$refs.container;
     this.stats = this.initStats();
     this.init3DEnvironmental();
@@ -79,35 +80,24 @@ export default class Three extends Vue {
       depthWrite: false,
     });
     const plane = new THREE.Mesh(geometry, metrial);
-    plane.receviceShadow = true;
+    plane.receiveShadow = true;
     plane.rotation.x = -0.5 * Math.PI;
     this.scene.add(plane);
   }
   initLights() {
-    const lights = [];
-    // lights[0] = new THREE.PointLight(0xffffff, 1, 0);
-    // lights[1] = new THREE.PointLight(0xffffff, 1, 0);
-    // lights[2] = new THREE.PointLight(0xffffff, 1, 0);
-    // lights[0].position.set(0, 3, 0);
-    // lights[1].position.set(1, 3, 1);
-    // lights[2].position.set(-1, -2, -1);
-    // lights.forEach((e) => this.scene.add(e));
     const light = new THREE.HemisphereLight(0xffffff, 0x444444);
     light.position.set(0, 20, 0);
     this.scene.add(light);
     const dirLight = new THREE.DirectionalLight(0xffffff);
     dirLight.position.set(-3, 10, -10);
     dirLight.castShadow = true;
-    dirLight.shadow.camera.top = 2;
-    dirLight.shadow.camera.bottom = -2;
-    dirLight.shadow.camera.left = 2;
-    dirLight.shadow.camera.right = 2;
+    dirLight.shadow.camera.top = 100;
+    dirLight.shadow.camera.bottom = -100;
+    dirLight.shadow.camera.left = 100;
+    dirLight.shadow.camera.right = 100;
     dirLight.shadow.camera.near = 0.1;
-    dirLight.shadow.camera.far = 40;
-
-    // spotLight.castShadow = true;
+    dirLight.shadow.camera.far = 1000;
     this.scene.add(dirLight);
-    return lights;
   }
   animate() {
     const mixerUpdateDelta = this.clock.getDelta();
@@ -129,7 +119,10 @@ export default class Three extends Vue {
         const model = gltf.scene;
         this.scene.add(model);
 
-        model.traverse((obj) => obj.isMesh && (obj.castShadow = true));
+        model.traverse((obj) => {
+          obj.isMesh && (obj.castShadow = true);
+          console.log(obj.isMesh);
+        });
 
         const animations = gltf.animations;
         this.animationMixer = new THREE.AnimationMixer(model);

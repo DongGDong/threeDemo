@@ -1,9 +1,9 @@
-import * as THREE from "../build/three.module.js";
+import * as THREE from "three/build/three.module";
 
-import Stats from "./jsm/libs/stats.module.js";
-import { GUI } from "./jsm/libs/dat.gui.module.js";
+import Stats from "three/examples/jsm/libs/stats.module";
+import { GUI } from "three/examples/jsm/libs/dat.gui.module";
 
-import { GLTFLoader } from "./jsm/loaders/GLTFLoader.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 
 let scene, renderer, camera, stats;
 let model, skeleton, mixer, clock;
@@ -20,8 +20,7 @@ let sizeOfNextStep = 0;
 init();
 
 function init() {
-  const container = document.getElementById("container");
-
+  const container = document.body;
   camera = new THREE.PerspectiveCamera(
     45,
     window.innerWidth / window.innerHeight,
@@ -65,7 +64,7 @@ function init() {
   scene.add(mesh);
 
   const loader = new GLTFLoader();
-  loader.load("models/gltf/Soldier.glb", function(gltf) {
+  loader.load("/resource/Soldier.glb", function(gltf) {
     model = gltf.scene;
     scene.add(model);
 
@@ -334,3 +333,74 @@ function setWeight(action, weight) {
 }
 
 // Called by the render loop
+
+function updateWeightSliders() {
+  settings["modify idle weight"] = idleWeight;
+  settings["modify walk weight"] = walkWeight;
+  settings["modify run weight"] = runWeight;
+}
+
+// Called by the render loop
+
+function updateCrossFadeControls() {
+  crossFadeControls.forEach(function(control) {
+    control.setDisabled();
+  });
+
+  if (idleWeight === 1 && walkWeight === 0 && runWeight === 0) {
+    crossFadeControls[1].setEnabled();
+  }
+
+  if (idleWeight === 0 && walkWeight === 1 && runWeight === 0) {
+    crossFadeControls[0].setEnabled();
+    crossFadeControls[2].setEnabled();
+  }
+
+  if (idleWeight === 0 && walkWeight === 0 && runWeight === 1) {
+    crossFadeControls[3].setEnabled();
+  }
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function animate() {
+  // Render loop
+
+  requestAnimationFrame(animate);
+
+  idleWeight = idleAction.getEffectiveWeight();
+  walkWeight = walkAction.getEffectiveWeight();
+  runWeight = runAction.getEffectiveWeight();
+
+  // Update the panel values if weights are modified from "outside" (by crossfadings)
+
+  updateWeightSliders();
+
+  // Enable/disable crossfade controls according to current weight values
+
+  updateCrossFadeControls();
+
+  // Get the time elapsed since the last frame, used for mixer update (if not in single step mode)
+
+  let mixerUpdateDelta = clock.getDelta();
+
+  // If in single step mode, make one step and then do nothing (until the user clicks again)
+
+  if (singleStepMode) {
+    mixerUpdateDelta = sizeOfNextStep;
+    sizeOfNextStep = 0;
+  }
+
+  // Update the animation mixer, the stats panel, and render this frame
+
+  mixer.update(mixerUpdateDelta);
+
+  stats.update();
+
+  renderer.render(scene, camera);
+}
