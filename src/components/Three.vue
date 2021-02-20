@@ -7,6 +7,7 @@ import { Vue, Component } from "vue-property-decorator";
 // import "./demo";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import Stats from "stats-js";
 @Component
 export default class Three extends Vue {
@@ -17,15 +18,20 @@ export default class Three extends Vue {
   renderer = null;
   cube = null;
   innerCube = null;
+  gltfLoader = null;
+  animationMixer = null;
+  actions = [];
+  clock = null;
   mounted() {
     this.container = this.$refs.container;
     this.stats = this.initStats();
     this.init3DEnvironmental();
-    this.addCube();
-    // this.addPlane();
-    this.addLights();
+    this.clock = new THREE.Clock();
+    this.initLights();
+    this.addPlane();
+    this.initLoaders();
+    this.loadGlb("/resource/Soldier.glb");
     this.initControls();
-    requestAnimationFrame(this.animate);
   }
   initStats() {
     const stats = new Stats();
@@ -38,20 +44,22 @@ export default class Three extends Vue {
     return stats;
   }
   init3DEnvironmental() {
-    this.renderer = new THREE.WebGLRenderer();
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setClearColor(0xeeeeee);
+    this.renderer.outputEncoding = THREE.sRGBEncoding;
+    this.renderer.shadowMap.enabled = true;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x444444);
+    this.scene.background = new THREE.Color(0xa0a0a0);
+    this.scene.fog = new THREE.Fog(0xa0a0a0, 10, 50);
     this.camera = new THREE.PerspectiveCamera(
-      75,
+      45,
       window.innerWidth / window.innerHeight,
-      0.01,
-      100
+      1,
+      1000
     );
-    this.camera.position.z = 50;
-    this.camera.lookAt(new THREE.Vector3(0, 0, 0));
-    const axes = new THREE.AxesHelper(1000);
-    this.scene.add(axes);
+    this.camera.position.set(1, 2, -3);
+    this.camera.lookAt(new THREE.Vector3(0, 1, 0));
     this.container.appendChild(this.renderer.domElement);
     window.onresize = this.resizeRenderer;
   }
@@ -65,46 +73,84 @@ export default class Three extends Vue {
     this.camera.updateProjectionMatrix();
   }
   addPlane() {
-    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 0), 3);
-    const helper = new THREE.PlaneHelper(plane, 300, 0xdee1e6);
-    this.scene.add(helper);
+    const geometry = new THREE.PlaneGeometry(100, 100);
+    const metrial = new THREE.MeshPhongMaterial({
+      color: 0x999999,
+      depthWrite: false,
+    });
+    const plane = new THREE.Mesh(geometry, metrial);
+    plane.receviceShadow = true;
+    plane.rotation.x = -0.5 * Math.PI;
+    this.scene.add(plane);
   }
-  addCube() {
-    const geomery = new THREE.BoxGeometry(10, 10, 10);
-    const innerMaterial = new THREE.MeshDepthMaterial();
-    // const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
-    // const wireframe = new THREE.WireframeGeometry(geomery);
-    // const cube = new THREE.LineSegments(wireframe, material);
-    // cube.material.depthTest = false;
-    // cube.material.opacity = 0.25;
-    // cube.material.transparent = true;
-    const innerCube = new THREE.Mesh(geomery, innerMaterial);
-    this.scene.add(innerCube);
-    // this.scene.add(cube);
-    this.containRender();
-    // this.cube = cube;
-    this.innerCube = innerCube;
-  }
-  addLights() {
+  initLights() {
     const lights = [];
-    lights[0] = new THREE.PointLight(0xffffff, 1, 0);
-    lights[1] = new THREE.PointLight(0xffffff, 1, 0);
-    lights[2] = new THREE.PointLight(0xffffff, 1, 0);
-    lights[0].position.set(0, 10, 0);
-    lights[1].position.set(10, 20, 10);
-    lights[2].position.set(-10, -20, -10);
-    lights.forEach((e) => this.scene.add(e));
+    // lights[0] = new THREE.PointLight(0xffffff, 1, 0);
+    // lights[1] = new THREE.PointLight(0xffffff, 1, 0);
+    // lights[2] = new THREE.PointLight(0xffffff, 1, 0);
+    // lights[0].position.set(0, 3, 0);
+    // lights[1].position.set(1, 3, 1);
+    // lights[2].position.set(-1, -2, -1);
+    // lights.forEach((e) => this.scene.add(e));
+    const light = new THREE.HemisphereLight(0xffffff, 0x444444);
+    light.position.set(0, 20, 0);
+    this.scene.add(light);
+    const dirLight = new THREE.DirectionalLight(0xffffff);
+    dirLight.position.set(-3, 10, -10);
+    dirLight.castShadow = true;
+    dirLight.shadow.camera.top = 2;
+    dirLight.shadow.camera.bottom = -2;
+    dirLight.shadow.camera.left = 2;
+    dirLight.shadow.camera.right = 2;
+    dirLight.shadow.camera.near = 0.1;
+    dirLight.shadow.camera.far = 40;
+
+    // spotLight.castShadow = true;
+    this.scene.add(dirLight);
     return lights;
   }
   animate() {
-    // this.cube.rotation.z += 0.01;
-    this.innerCube.rotation.z += 0.01;
+    const mixerUpdateDelta = this.clock.getDelta();
+    this.animationMixer.update(mixerUpdateDelta);
     this.containRender();
     this.stats.update();
     requestAnimationFrame(this.animate);
   }
   containRender() {
     this.renderer.render(this.scene, this.camera);
+  }
+  initLoaders() {
+    this.gltfLoader = new GLTFLoader();
+  }
+  loadGlb(path) {
+    this.gltfLoader.load(
+      path,
+      (gltf) => {
+        const model = gltf.scene;
+        this.scene.add(model);
+
+        model.traverse((obj) => obj.isMesh && (obj.castShadow = true));
+
+        const animations = gltf.animations;
+        this.animationMixer = new THREE.AnimationMixer(model);
+        const idleAction = this.animationMixer.clipAction(animations[0]);
+        const walkAction = this.animationMixer.clipAction(animations[3]);
+        const runAction = this.animationMixer.clipAction(animations[1]);
+        this.actions = [idleAction, walkAction, runAction];
+        this.allActionPlay();
+        this.animate();
+      },
+      () => {},
+      (error) => console.log(error)
+    );
+  }
+  allActionPlay() {
+    this.actions.forEach((action) => {
+      action.enabled = true;
+      action.setEffectiveTimeScale(1);
+      action.setEffectiveWeight(1);
+    });
+    this.actions.forEach((action, e) => e == 1 && action.play());
   }
 }
 </script>
